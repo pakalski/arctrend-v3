@@ -2,23 +2,6 @@
 import { useState, useEffect } from 'react';
 import KpiChart from '@/components/KpiChart';
 import { supabase } from '@/lib/supabase';
-import { createWalletClient, custom } from 'viem';
-import { arcTestnet } from '@/lib/arc-client'; // Make sure this file exists
-
-const CONTRACT_ADDRESS = '0x5391d64389995d86dDb7a8FfdC4F8d854B61a0FF';
-
-const ABI = [
-  {
-    name: 'executeBatch',
-    type: 'function',
-    stateMutability: 'payable',
-    inputs: [
-      { name: 'recipients', type: 'address[]' },
-      { name: 'amounts', type: 'uint256[]' }
-    ],
-    outputs: []
-  }
-];
 
 export default function Home() {
   const [data, setData] = useState<any[]>([]);
@@ -26,7 +9,7 @@ export default function Home() {
   const [timeRange, setTimeRange] = useState('30d');
   const [loading, setLoading] = useState(false);
 
-  // Treasury form
+  // Treasury batch form
   const [recipients, setRecipients] = useState<string[]>(['']);
   const [amounts, setAmounts] = useState<string[]>(['']);
 
@@ -34,6 +17,7 @@ export default function Home() {
     const { data: result } = await supabase
       .from('network_snapshots')
       .select('*')
+      .eq('network', 'arc_testnet')
       .order('date', { ascending: true });
     setData(result || []);
   };
@@ -58,10 +42,11 @@ export default function Home() {
         usdc_volume: stats.usdc_volume_24h || 0,
         new_contracts: stats.new_contracts_24h || 0,
       });
+
       await loadData();
-      alert('✅ Real live Arc testnet data refreshed!');
+      alert('✅ Real live Arc testnet data loaded!');
     } catch (e) {
-      alert('Could not fetch live data. Try again.');
+      alert('Could not fetch live data. Try again in a moment.');
     }
     setLoading(false);
   };
@@ -77,7 +62,7 @@ export default function Home() {
     return true;
   });
 
-  // Treasury batch helpers
+  // Treasury form helpers
   const addRow = () => {
     setRecipients([...recipients, '']);
     setAmounts([...amounts, '']);
@@ -99,35 +84,6 @@ export default function Home() {
     if (recipients.length === 1) return;
     setRecipients(recipients.filter((_, i) => i !== index));
     setAmounts(amounts.filter((_, i) => i !== index));
-  };
-
-  const executeBatch = async () => {
-    if (!window.ethereum) {
-      alert('Please install MetaMask');
-      return;
-    }
-
-    try {
-      const walletClient = createWalletClient({
-        chain: arcTestnet,
-        transport: custom(window.ethereum)
-      });
-
-      const [account] = await walletClient.getAddresses();
-
-      const hash = await walletClient.writeContract({
-        address: CONTRACT_ADDRESS,
-        abi: ABI,
-        functionName: 'executeBatch',
-        args: [recipients, amounts.map(a => BigInt(Math.floor(parseFloat(a) * 1e18)))],
-        account,
-        value: BigInt(Math.floor(amounts.reduce((sum, a) => sum + parseFloat(a), 0) * 1e18)),
-      });
-
-      alert(`Transaction sent! Hash: ${hash}`);
-    } catch (e: any) {
-      alert('Transaction failed or cancelled: ' + e.message);
-    }
   };
 
   return (
@@ -157,13 +113,16 @@ export default function Home() {
       <div className="max-w-7xl mx-auto px-8">
         <div className="flex border-b border-slate-700">
           {['overview', 'institutional', 'competitive', 'treasury'].map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)} className={`px-8 py-6 text-lg font-medium border-b-2 transition-all ${activeTab === tab ? 'border-emerald-400 text-white' : 'border-transparent text-slate-400 hover:text-slate-200'}`}>
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-8 py-6 text-lg font-medium border-b-2 transition-all ${activeTab === tab ? 'border-emerald-400 text-white' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+            >
               {tab === 'overview' ? 'Overview' : tab === 'institutional' ? 'Institutional Signals' : tab === 'competitive' ? 'Competitive Benchmark' : 'My Treasury Contract'}
             </button>
           ))}
         </div>
 
-        {/* Overview */}
         {activeTab === 'overview' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-10">
             <KpiChart title="Daily Active Wallets (DAA)" data={filteredData} dataKey="active_wallets" color="#10b981" />
@@ -173,7 +132,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* Institutional Signals */}
         {activeTab === 'institutional' && (
           <div className="mt-10 p-8 bg-slate-900 border border-slate-700 rounded-3xl">
             <h2 className="text-3xl font-semibold mb-8">Institutional Signals</h2>
@@ -185,29 +143,19 @@ export default function Home() {
           </div>
         )}
 
-        {/* Competitive Benchmark */}
         {activeTab === 'competitive' && (
           <div className="mt-10">
             <h2 className="text-3xl font-semibold mb-8">Competitive Benchmark</h2>
             <p className="text-slate-400 mb-8">Arc Testnet vs Base Sepolia vs Arbitrum Sepolia</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div>
-                <h3 className="text-emerald-400 text-lg font-medium mb-4">Arc Testnet</h3>
-                <KpiChart title="Daily Active Wallets" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="active_wallets" color="#10b981" />
-              </div>
-              <div>
-                <h3 className="text-blue-400 text-lg font-medium mb-4">Base Sepolia</h3>
-                <KpiChart title="Daily Active Wallets" data={filteredData.filter(d => d.network === 'base_sepolia')} dataKey="active_wallets" color="#3b82f6" />
-              </div>
-              <div>
-                <h3 className="text-purple-400 text-lg font-medium mb-4">Arbitrum Sepolia</h3>
-                <KpiChart title="Daily Active Wallets" data={filteredData.filter(d => d.network === 'arbitrum_sepolia')} dataKey="active_wallets" color="#a78bfa" />
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <KpiChart title="Daily Active Wallets" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="active_wallets" color="#10b981" />
+              <KpiChart title="USDC Volume" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="usdc_volume" color="#3b82f6" prefix="$" />
+              <KpiChart title="New Wallets" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="new_wallets" color="#8b5cf6" />
+              <KpiChart title="New Contracts" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="new_contracts" color="#f59e0b" />
             </div>
           </div>
         )}
 
-        {/* Treasury Contract - Full UX */}
         {activeTab === 'treasury' && (
           <div className="mt-10 p-10 bg-gradient-to-br from-slate-900 to-emerald-950 border border-emerald-400/30 rounded-3xl">
             <h2 className="text-3xl font-bold mb-8">Your Treasury Batch Router</h2>
@@ -249,10 +197,10 @@ export default function Home() {
             </button>
 
             <button 
-              onClick={executeBatch}
+              onClick={() => alert("Batch payment button is non-functional for now.\n\nIn the full version it would connect to MetaMask and call your contract.")}
               className="mt-10 w-full bg-emerald-500 hover:bg-emerald-600 py-5 rounded-2xl font-semibold text-lg"
             >
-              Execute Batch Payment (MetaMask)
+              Execute Batch Payment
             </button>
           </div>
         )}
