@@ -26,30 +26,23 @@ export default function Home() {
     loadData();
   }, []);
 
-  const refreshLiveData = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('https://testnet.arcscan.app/api/v2/stats');
-      const stats = await res.json();
-      const today = new Date().toISOString().split('T')[0];
-
-      await supabase.from('network_snapshots').upsert({
-        date: today,
-        network: 'arc_testnet',
-        active_wallets: stats.active_addresses_24h || 0,
-        new_wallets: stats.new_addresses_24h || 0,
-        tx_count: stats.transactions_24h || 0,
-        usdc_volume: stats.usdc_volume_24h || 0,
-        new_contracts: stats.new_contracts_24h || 0,
-      });
-
-      await loadData();
+ const refreshLiveData = async () => {
+  setLoading(true);
+  try {
+    const res = await fetch('/api/refresh');
+    const result = await res.json();
+    
+    if (result.success) {
+      await loadData(); // Refresh the charts
       alert('✅ Real live Arc testnet data loaded!');
-    } catch (e) {
-      alert('Could not fetch live data. Try again in a moment.');
+    } else {
+      alert('Failed to refresh data');
     }
-    setLoading(false);
-  };
+  } catch (e) {
+    alert('Could not connect to the refresh endpoint.');
+  }
+  setLoading(false);
+};
 
   const filteredData = data.filter(row => {
     const rowDate = new Date(row.date);
