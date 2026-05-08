@@ -10,10 +10,12 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
 
   const loadData = async () => {
-    const { data: result } = await supabase
+    const { data: result, error } = await supabase
       .from('network_snapshots')
       .select('*')
       .order('date', { ascending: true });
+    
+    if (error) console.error("Error loading data:", error);
     setData(result || []);
   };
 
@@ -23,53 +25,20 @@ export default function Home() {
 
   const refreshAllData = async () => {
     setLoading(true);
-    const today = new Date().toISOString().split('T')[0];
-
     try {
-      // === ARC TESTNET ===
-      const arcRes = await fetch('https://testnet.arcscan.app/api/v2/stats');
-      const arc = await arcRes.json();
-
-      await supabase.from('network_snapshots').upsert({
-        date: today,
-        network: 'arc_testnet',
-        active_wallets: arc.total_addresses || 0,
-        new_wallets: arc.new_addresses_24h || 0,
-        tx_count: arc.transactions_24h || arc.transactions_today || 0,
-        new_contracts: arc.new_contracts_24h || 0,
-      });
-
-      // === BASE SEPOLIA ===
-      const baseRes = await fetch('https://base-sepolia.blockscout.com/api/v2/stats');
-      const base = await baseRes.json();
-
-      await supabase.from('network_snapshots').upsert({
-        date: today,
-        network: 'base_sepolia',
-        active_wallets: base.active_addresses_24h || base.total_addresses || 0,
-        new_wallets: base.new_addresses_24h || 0,
-        tx_count: base.transactions_24h || 0,
-        new_contracts: base.new_contracts_24h || 0,
-      });
-
-      // === ARBITRUM SEPOLIA ===
-      const arbRes = await fetch('https://arbitrum-sepolia.blockscout.com/api/v2/stats');
-      const arb = await arbRes.json();
-
-      await supabase.from('network_snapshots').upsert({
-        date: today,
-        network: 'arbitrum_sepolia',
-        active_wallets: arb.active_addresses_24h || arb.total_addresses || 0,
-        new_wallets: arb.new_addresses_24h || 0,
-        tx_count: arb.transactions_24h || 0,
-        new_contracts: arb.new_contracts_24h || 0,
-      });
-
-      await loadData();
-      alert('✅ Real data pulled from Arc, Base Sepolia, and Arbitrum Sepolia!');
+      // Call our centralized Next.js API route
+      const res = await fetch('/api/refresh');
+      const result = await res.json();
+      
+      if (result.success) {
+        await loadData();
+        alert('✅ Real data successfully refreshed for all chains!');
+      } else {
+        alert('⚠️ Some chains failed to load. Check console.');
+      }
     } catch (e) {
       console.error(e);
-      alert('Some chains failed to load. Try again.');
+      alert('Network error while refreshing data.');
     }
     setLoading(false);
   };
@@ -85,108 +54,183 @@ export default function Home() {
     return true;
   });
 
+  // Helper to get the most recent snapshot for a specific chain
+  const getLatest = (network: string) => {
+    const chainData = filteredData.filter(d => d.network === network);
+    return chainData.length > 0 ? chainData[chainData.length - 1] : null;
+  };
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="border-b border-slate-800 bg-slate-900">
-        <div className="max-w-7xl mx-auto px-8 py-8 flex justify-between items-center">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
+      <div className="border-b border-slate-800 bg-slate-900 sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-8 py-6 flex flex-col md:flex-row md:justify-between md:items-center gap-6">
           <div>
-            <h1 className="text-6xl font-bold tracking-tighter">ArcTrend</h1>
-            <p className="text-slate-400 text-2xl mt-1">Real Multi-Chain KPI Tracking</p>
+            <h1 className="text-5xl font-extrabold tracking-tight bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">ArcTrend</h1>
+            <p className="text-slate-400 text-xl mt-2">Institutional Multi-Chain KPI Tracking</p>
           </div>
           <div className="flex items-center gap-4">
             <select 
               value={timeRange} 
               onChange={(e) => setTimeRange(e.target.value)} 
-              className="bg-slate-900 border border-slate-700 rounded-xl px-6 py-3 text-lg"
+              className="bg-slate-950 border border-slate-700 rounded-xl px-5 py-3 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
             >
-              <option value="7d">1 Week</option>
-              <option value="30d">1 Month</option>
-              <option value="90d">3 Months</option>
-              <option value="180d">6 Months</option>
-              <option value="365d">1 Year</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="30d">Last 30 Days</option>
+              <option value="90d">Last 3 Months</option>
+              <option value="180d">Last 6 Months</option>
+              <option value="365d">Last Year</option>
               <option value="all">All Time</option>
             </select>
             <button 
               onClick={refreshAllData} 
               disabled={loading} 
-              className="bg-emerald-500 hover:bg-emerald-600 px-6 py-3 rounded-2xl font-medium"
+              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
             >
-              {loading ? 'Fetching real data...' : '🔄 Refresh All Chains'}
+              {loading ? 'Fetching...' : '🔄 Sync Nodes'}
             </button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-8">
-        <div className="flex border-b border-slate-700">
-          {['overview', 'institutional', 'competitive', 'treasury'].map(tab => (
+      <div className="max-w-7xl mx-auto px-8 py-8">
+        <div className="flex flex-wrap gap-2 border-b border-slate-800 mb-8">
+          {[
+            { id: 'overview', label: 'Network Overview' },
+            { id: 'competitive', label: 'Competitive Benchmark' },
+            { id: 'institutional', label: 'Institutional Signals' },
+            { id: 'treasury', label: 'Treasury Batch' }
+          ].map(tab => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-8 py-6 text-lg font-medium border-b-2 transition-all ${activeTab === tab ? 'border-emerald-400 text-white' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-6 py-4 text-sm font-semibold rounded-t-xl transition-all ${
+                activeTab === tab.id 
+                ? 'bg-slate-800 text-emerald-400 border-b-2 border-emerald-400' 
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+              }`}
             >
-              {tab === 'overview' ? 'Overview' : tab === 'institutional' ? 'Institutional Signals' : tab === 'competitive' ? 'Competitive Benchmark' : 'My Treasury Contract'}
+              {tab.label}
             </button>
           ))}
         </div>
 
         {activeTab === 'overview' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-10">
-            <KpiChart title="Daily Active Wallets (DAA)" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="active_wallets" color="#10b981" />
-            <KpiChart title="Transactions (24h)" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="tx_count" color="#3b82f6" />
-            <KpiChart title="New Wallets (24h)" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="new_wallets" color="#8b5cf6" />
-            <KpiChart title="New Contracts" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="new_contracts" color="#f59e0b" />
-          </div>
-        )}
+          <div className="space-y-8 animate-in fade-in duration-500">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+                <p className="text-slate-400 text-sm font-medium mb-1">Today's Active Wallets</p>
+                <p className="text-3xl font-bold text-emerald-400">{getLatest('arc_testnet')?.active_wallets?.toLocaleString() || '---'}</p>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+                <p className="text-slate-400 text-sm font-medium mb-1">24h Transactions</p>
+                <p className="text-3xl font-bold text-blue-400">{getLatest('arc_testnet')?.tx_count?.toLocaleString() || '---'}</p>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+                <p className="text-slate-400 text-sm font-medium mb-1">New Contracts</p>
+                <p className="text-3xl font-bold text-fuchsia-400">{getLatest('arc_testnet')?.new_contracts?.toLocaleString() || '---'}</p>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+                <p className="text-slate-400 text-sm font-medium mb-1">Avg Gas Fee</p>
+                <p className="text-3xl font-bold text-amber-400">{getLatest('arc_testnet')?.avg_gas_fee?.toLocaleString() || '---'} <span className="text-sm font-normal text-slate-500">wei</span></p>
+              </div>
+            </div>
 
-        {activeTab === 'institutional' && (
-          <div className="mt-10 p-8 bg-slate-900 border border-slate-700 rounded-3xl">
-            <h2 className="text-3xl font-semibold mb-8">Institutional Signals</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <KpiChart title="Large Transactions (> $10k)" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="large_tx_10k" color="#ec4899" />
-              <KpiChart title="CCTP Bridge Volume" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="cctp_volume" color="#06b67f" prefix="$" />
-              <KpiChart title="Batch Payment Rate" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="batch_tx_rate" color="#a78bfa" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <KpiChart title="Daily Active Wallets (DAA)" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="active_wallets" color="#34d399" />
+              <KpiChart title="Transactions (24h)" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="tx_count" color="#60a5fa" />
+              <KpiChart title="New Wallets (24h)" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="new_wallets" color="#c084fc" />
+              <KpiChart title="New Contracts Deployed" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="new_contracts" color="#fbbf24" />
             </div>
           </div>
         )}
 
         {activeTab === 'competitive' && (
-          <div className="mt-10">
-            <h2 className="text-3xl font-semibold mb-8">Competitive Benchmark</h2>
-            <p className="text-slate-400 mb-8">Arc Testnet vs Base Sepolia vs Arbitrum Sepolia (real data)</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div>
-                <h3 className="text-emerald-400 text-lg font-medium mb-4">Arc Testnet</h3>
-                <KpiChart title="Daily Active Wallets" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="active_wallets" color="#10b981" />
-                <KpiChart title="New Wallets" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="new_wallets" color="#8b5cf6" />
+          <div className="animate-in fade-in duration-500 space-y-10">
+            {/* Snapshot Comparison Cards */}
+            <div>
+              <h2 className="text-2xl font-bold mb-6">Latest 24h Snapshot</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-emerald-950/30 border border-emerald-500/30 p-6 rounded-2xl">
+                  <h3 className="text-emerald-400 font-bold text-xl mb-4">Arc Testnet</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between"><span className="text-slate-400">Active Wallets:</span> <span className="font-medium">{getLatest('arc_testnet')?.active_wallets?.toLocaleString() || 0}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-400">Transactions:</span> <span className="font-medium">{getLatest('arc_testnet')?.tx_count?.toLocaleString() || 0}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-400">New Contracts:</span> <span className="font-medium">{getLatest('arc_testnet')?.new_contracts?.toLocaleString() || 0}</span></div>
+                  </div>
+                </div>
+                <div className="bg-blue-950/30 border border-blue-500/30 p-6 rounded-2xl">
+                  <h3 className="text-blue-400 font-bold text-xl mb-4">Base Sepolia</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between"><span className="text-slate-400">Active Wallets:</span> <span className="font-medium">{getLatest('base_sepolia')?.active_wallets?.toLocaleString() || 0}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-400">Transactions:</span> <span className="font-medium">{getLatest('base_sepolia')?.tx_count?.toLocaleString() || 0}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-400">New Contracts:</span> <span className="font-medium">{getLatest('base_sepolia')?.new_contracts?.toLocaleString() || 0}</span></div>
+                  </div>
+                </div>
+                <div className="bg-purple-950/30 border border-purple-500/30 p-6 rounded-2xl">
+                  <h3 className="text-purple-400 font-bold text-xl mb-4">Arbitrum Sepolia</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between"><span className="text-slate-400">Active Wallets:</span> <span className="font-medium">{getLatest('arbitrum_sepolia')?.active_wallets?.toLocaleString() || 0}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-400">Transactions:</span> <span className="font-medium">{getLatest('arbitrum_sepolia')?.tx_count?.toLocaleString() || 0}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-400">New Contracts:</span> <span className="font-medium">{getLatest('arbitrum_sepolia')?.new_contracts?.toLocaleString() || 0}</span></div>
+                  </div>
+                </div>
               </div>
-              <div>
-                <h3 className="text-blue-400 text-lg font-medium mb-4">Base Sepolia</h3>
-                <KpiChart title="Daily Active Wallets" data={filteredData.filter(d => d.network === 'base_sepolia')} dataKey="active_wallets" color="#3b82f6" />
-                <KpiChart title="New Wallets" data={filteredData.filter(d => d.network === 'base_sepolia')} dataKey="new_wallets" color="#8b5cf6" />
+            </div>
+
+            <div>
+              <h2 className="text-2xl font-bold mb-6">Historical Comparison</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                  <h3 className="text-emerald-400 font-semibold mb-4">Arc Testnet Trend</h3>
+                  <KpiChart title="Daily Active Wallets" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="active_wallets" color="#34d399" />
+                </div>
+                <div>
+                  <h3 className="text-blue-400 font-semibold mb-4">Base Sepolia Trend</h3>
+                  <KpiChart title="Daily Active Wallets" data={filteredData.filter(d => d.network === 'base_sepolia')} dataKey="active_wallets" color="#60a5fa" />
+                </div>
+                <div>
+                  <h3 className="text-purple-400 font-semibold mb-4">Arbitrum Sepolia Trend</h3>
+                  <KpiChart title="Daily Active Wallets" data={filteredData.filter(d => d.network === 'arbitrum_sepolia')} dataKey="active_wallets" color="#c084fc" />
+                </div>
               </div>
-              <div>
-                <h3 className="text-purple-400 text-lg font-medium mb-4">Arbitrum Sepolia</h3>
-                <KpiChart title="Daily Active Wallets" data={filteredData.filter(d => d.network === 'arbitrum_sepolia')} dataKey="active_wallets" color="#a78bfa" />
-                <KpiChart title="New Wallets" data={filteredData.filter(d => d.network === 'arbitrum_sepolia')} dataKey="new_wallets" color="#a78bfa" />
-              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'institutional' && (
+          <div className="animate-in fade-in duration-500 mt-4 p-10 bg-slate-900 border border-slate-800 rounded-3xl shadow-xl">
+            <div className="mb-10">
+              <h2 className="text-3xl font-bold mb-2">Institutional Signals</h2>
+              <p className="text-slate-400">Deep metrics indicating sophisticated capital movement on Arc.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Note: In a real environment, large_tx and cctp_volume require deeper indexing */}
+              <KpiChart title="USDC Bridge Volume (Simulated/Placeholder)" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="usdc_volume" color="#0ea5e9" prefix="$" />
+              <KpiChart title="Average Gas Fee (Wei)" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="avg_gas_fee" color="#f43f5e" />
             </div>
           </div>
         )}
 
         {activeTab === 'treasury' && (
-          <div className="mt-10 p-10 bg-gradient-to-br from-slate-900 to-emerald-950 border border-emerald-400/30 rounded-3xl">
-            <h2 className="text-3xl font-bold mb-8">Your Treasury Batch Router</h2>
-            <div className="bg-slate-950 rounded-2xl p-6 mb-8 font-mono text-sm break-all">
-              0x5391d64389995d86dDb7a8FfdC4F8d854B61a0FF
+          <div className="animate-in fade-in duration-500 mt-4 p-10 bg-gradient-to-br from-slate-900 to-emerald-950/40 border border-emerald-500/20 rounded-3xl">
+            <h2 className="text-3xl font-bold mb-4 text-emerald-400">Treasury Operations</h2>
+            <p className="text-slate-300 mb-8">Execute batched multisig payments directly to the Arc Network.</p>
+            
+            <div className="bg-slate-950/80 rounded-xl p-4 mb-8 font-mono text-emerald-500 text-sm border border-slate-800 inline-block">
+              Contract: 0x5391d64389995d86dDb7a8FfdC4F8d854B61a0FF
             </div>
-            {/* Your existing batch payment form stays here unchanged */}
+            
+            <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800">
+              {/* Your existing batch payment form stays here unchanged */}
+            </div>
           </div>
         )}
       </div>
 
-      <footer className="text-center text-slate-500 text-sm mt-20 pb-12">
-        Built for real KPI tracking • Data from Arc, Base, and Arbitrum testnets
+      <footer className="border-t border-slate-800 mt-20">
+        <div className="max-w-7xl mx-auto px-8 py-8 text-center text-slate-500 text-sm">
+          ArcTrend Data Dashboard • Real-time metrics indexed via Blockscout V2 API
+        </div>
       </footer>
     </div>
   );
