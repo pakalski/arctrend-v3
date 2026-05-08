@@ -1,10 +1,9 @@
 name: Daily Metrics Sync
 
-# This workflow runs automatically every day, and can also be triggered manually
 on:
   schedule:
-    - cron: '0 0 * * *' # Runs at midnight UTC daily
-  workflow_dispatch: # Allows you to click a button in GitHub to run it instantly
+    - cron: '0 0 * * *'
+  workflow_dispatch:
 
 jobs:
   update-metrics:
@@ -17,7 +16,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Install Dependencies
         run: npm install @supabase/supabase-js
