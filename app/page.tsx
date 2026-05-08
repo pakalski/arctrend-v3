@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 export default function Home() {
   const [data, setData] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('overview');
-  const [timeRange, setTimeRange] = useState('30d');
+  const [timeRange, setTimeRange] = useState('all');
 
   const loadData = async () => {
     const { data: result, error } = await supabase
@@ -68,8 +68,7 @@ export default function Home() {
           {[
             { id: 'overview', label: 'Network Overview' },
             { id: 'competitive', label: 'Competitive Benchmark' },
-            { id: 'institutional', label: 'Institutional Signals' },
-            { id: 'treasury', label: 'Treasury Batch' }
+            { id: 'institutional', label: 'Institutional Signals' }
           ].map(tab => (
             <button
               key={tab.id}
@@ -90,19 +89,19 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
                 <p className="text-slate-400 text-sm font-medium mb-1">Today's Active Wallets</p>
-                <p className="text-3xl font-bold text-emerald-400">{getLatest('arc_testnet')?.active_wallets?.toLocaleString() || '---'}</p>
+                <p className="text-3xl font-bold text-emerald-400">{getLatest('arc_testnet')?.active_wallets?.toLocaleString() || '0'}</p>
               </div>
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
                 <p className="text-slate-400 text-sm font-medium mb-1">24h Transactions</p>
-                <p className="text-3xl font-bold text-blue-400">{getLatest('arc_testnet')?.tx_count?.toLocaleString() || '---'}</p>
+                <p className="text-3xl font-bold text-blue-400">{getLatest('arc_testnet')?.tx_count?.toLocaleString() || '0'}</p>
               </div>
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
                 <p className="text-slate-400 text-sm font-medium mb-1">New Contracts</p>
-                <p className="text-3xl font-bold text-fuchsia-400">{getLatest('arc_testnet')?.new_contracts?.toLocaleString() || '---'}</p>
+                <p className="text-3xl font-bold text-fuchsia-400">{getLatest('arc_testnet')?.new_contracts?.toLocaleString() || '0'}</p>
               </div>
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
                 <p className="text-slate-400 text-sm font-medium mb-1">Avg Gas Fee</p>
-                <p className="text-3xl font-bold text-amber-400">{getLatest('arc_testnet')?.avg_gas_fee?.toLocaleString() || '---'} <span className="text-sm font-normal text-slate-500">wei</span></p>
+                <p className="text-3xl font-bold text-amber-400">{getLatest('arc_testnet')?.avg_gas_fee?.toLocaleString() || '0'} <span className="text-sm font-normal text-slate-500">wei</span></p>
               </div>
             </div>
 
@@ -176,21 +175,6 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <KpiChart title="USDC Bridge Volume (Simulated/Placeholder)" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="usdc_volume" color="#0ea5e9" prefix="$" />
               <KpiChart title="Average Gas Fee (Wei)" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="avg_gas_fee" color="#f43f5e" />
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'treasury' && (
-          <div className="animate-in fade-in duration-500 mt-4 p-10 bg-gradient-to-br from-slate-900 to-emerald-950/40 border border-emerald-500/20 rounded-3xl">
-            <h2 className="text-3xl font-bold mb-4 text-emerald-400">Treasury Operations</h2>
-            <p className="text-slate-300 mb-8">Execute batched multisig payments directly to the Arc Network.</p>
-            
-            <div className="bg-slate-950/80 rounded-xl p-4 mb-8 font-mono text-emerald-500 text-sm border border-slate-800 inline-block">
-              Contract: 0x5391d64389995d86dDb7a8FfdC4F8d854B61a0FF
-            </div>
-            
-            <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800">
-              {/* Your existing batch payment form stays here unchanged */}
             </div>
           </div>
         )}
