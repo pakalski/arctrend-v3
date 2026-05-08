@@ -1,0 +1,29 @@
+name: Daily Metrics Sync
+
+# This workflow runs automatically every day, and can also be triggered manually
+on:
+  schedule:
+    - cron: '0 0 * * *' # Runs at midnight UTC daily
+  workflow_dispatch: # Allows you to click a button in GitHub to run it instantly
+
+jobs:
+  update-metrics:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Dependencies
+        run: npm install @supabase/supabase-js
+
+      - name: Run Data Sync Script
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: node scripts/sync-metrics.js
