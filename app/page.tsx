@@ -7,7 +7,6 @@ export default function Home() {
   const [data, setData] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('overview');
   const [timeRange, setTimeRange] = useState('30d');
-  const [loading, setLoading] = useState(false);
 
   const loadData = async () => {
     const { data: result, error } = await supabase
@@ -23,26 +22,6 @@ export default function Home() {
     loadData();
   }, []);
 
-  const refreshAllData = async () => {
-    setLoading(true);
-    try {
-      // Call our centralized Next.js API route
-      const res = await fetch('/api/refresh');
-      const result = await res.json();
-      
-      if (result.success) {
-        await loadData();
-        alert('✅ Real data successfully refreshed for all chains!');
-      } else {
-        alert('⚠️ Some chains failed to load. Check console.');
-      }
-    } catch (e) {
-      console.error(e);
-      alert('Network error while refreshing data.');
-    }
-    setLoading(false);
-  };
-
   const filteredData = data.filter(row => {
     const rowDate = new Date(row.date);
     const now = new Date();
@@ -54,7 +33,6 @@ export default function Home() {
     return true;
   });
 
-  // Helper to get the most recent snapshot for a specific chain
   const getLatest = (network: string) => {
     const chainData = filteredData.filter(d => d.network === network);
     return chainData.length > 0 ? chainData[chainData.length - 1] : null;
@@ -81,13 +59,6 @@ export default function Home() {
               <option value="365d">Last Year</option>
               <option value="all">All Time</option>
             </select>
-            <button 
-              onClick={refreshAllData} 
-              disabled={loading} 
-              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
-            >
-              {loading ? 'Fetching...' : '🔄 Sync Nodes'}
-            </button>
           </div>
         </div>
       </div>
@@ -146,7 +117,6 @@ export default function Home() {
 
         {activeTab === 'competitive' && (
           <div className="animate-in fade-in duration-500 space-y-10">
-            {/* Snapshot Comparison Cards */}
             <div>
               <h2 className="text-2xl font-bold mb-6">Latest 24h Snapshot</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -204,7 +174,6 @@ export default function Home() {
               <p className="text-slate-400">Deep metrics indicating sophisticated capital movement on Arc.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Note: In a real environment, large_tx and cctp_volume require deeper indexing */}
               <KpiChart title="USDC Bridge Volume (Simulated/Placeholder)" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="usdc_volume" color="#0ea5e9" prefix="$" />
               <KpiChart title="Average Gas Fee (Wei)" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="avg_gas_fee" color="#f43f5e" />
             </div>
