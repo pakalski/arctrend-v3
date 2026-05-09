@@ -147,7 +147,7 @@ export default function Home() {
             </div>
 
             <div>
-              <h2 className="text-2xl font-bold mb-6">Historical Comparison</h2>
+              <h2 className="text-2xl font-bold mb-6">Historical Comparison (Active Wallets)</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div>
                   <h3 className="text-emerald-400 font-semibold mb-4">Arc Testnet Trend</h3>
