@@ -12,39 +12,31 @@ const CHAINS = [
 ];
 
 async function runBackfill() {
-  console.log('Initiating robust historical data backfill...');
+  console.log('Initiating authentic historical data backfill...');
 
   for (const chain of CHAINS) {
     try {
       console.log(`Processing historical data for ${chain.id}...`);
       const historyMap = {};
 
-      // 1. Fetch Historical Transactions
+      // 1. Fetch True Historical Transactions
       try {
         const txRes = await fetch(`${chain.baseUrl}/transactions`, { headers: { 'Accept': 'application/json' } });
         if (txRes.ok) {
           const txData = await txRes.json();
-          // Safely extract the array regardless of Blockscout version
           const items = txData.chart_data || (Array.isArray(txData) ? txData : []);
           
           items.forEach(item => {
             if (!historyMap[item.date]) historyMap[item.date] = { date: item.date, network: chain.id };
-            
-            // Clean string values (e.g., convert "1,000" to 1000)
             const txVal = String(item.tx_count || item.value || '0').replace(/,/g, '');
-            const parsedTx = parseInt(txVal, 10) || 0;
-            
-            historyMap[item.date].tx_count = parsedTx;
-            
-            // Derive active wallets to ensure competitive charts render
-            historyMap[item.date].active_wallets = Math.floor(parsedTx * 0.35); 
+            historyMap[item.date].tx_count = parseInt(txVal, 10) || 0;
           });
         }
       } catch (e) {
         console.log(`Transactions historical fetch failed for ${chain.id}.`);
       }
 
-      // 2. Fetch Historical New Contracts
+      // 2. Fetch True Historical New Contracts
       try {
         const contractsRes = await fetch(`${chain.baseUrl}/new-contracts`, { headers: { 'Accept': 'application/json' } });
         if (contractsRes.ok) {
@@ -61,6 +53,23 @@ async function runBackfill() {
         console.log(`New contracts historical fetch failed for ${chain.id}.`);
       }
 
+      // 3. Fetch True Historical Active Accounts
+      try {
+        const activeRes = await fetch(`${chain.baseUrl}/active-accounts`, { headers: { 'Accept': 'application/json' } });
+        if (activeRes.ok) {
+          const activeData = await activeRes.json();
+          const items = activeData.chart_data || (Array.isArray(activeData) ? activeData : []);
+          
+          items.forEach(item => {
+            if (!historyMap[item.date]) historyMap[item.date] = { date: item.date, network: chain.id };
+            const walletVal = String(item.active_accounts || item.value || '0').replace(/,/g, '');
+            historyMap[item.date].active_wallets = parseInt(walletVal, 10) || 0;
+          });
+        }
+      } catch (e) {
+        console.log(`Active accounts historical fetch failed for ${chain.id}.`);
+      }
+
       const recordsToInsert = Object.values(historyMap);
       
       if (recordsToInsert.length === 0) {
@@ -70,7 +79,6 @@ async function runBackfill() {
 
       console.log(`Preparing to insert ${recordsToInsert.length} historical records for ${chain.id}...`);
 
-      // Upsert into Supabase in batches to prevent timeouts
       for (let i = 0; i < recordsToInsert.length; i += 100) {
         const batch = recordsToInsert.slice(i, i + 100);
         const { error } = await supabase.from('network_snapshots').upsert(batch, { onConflict: 'date, network' });
