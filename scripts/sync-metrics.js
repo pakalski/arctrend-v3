@@ -11,11 +11,10 @@ const CHAINS = [
   { id: 'arbitrum_sepolia', url: 'https://arbitrum-sepolia.blockscout.com/api/v2/stats' }
 ];
 
-// Helper to safely parse API string numbers (strips commas and converts to pure integers)
 const safeParse = (val) => parseInt(String(val || '0').replace(/,/g, ''), 10) || 0;
 
 async function runSync() {
-  console.log('Starting robust data synchronization...');
+  console.log('Starting pure data synchronization...');
   const today = new Date().toISOString().split('T')[0];
 
   for (const chain of CHAINS) {
@@ -27,7 +26,7 @@ async function runSync() {
       const stats = await res.json();
 
       const tx_count = safeParse(stats.transactions_24h || stats.transactions_today);
-      const active_wallets = safeParse(stats.active_addresses_24h) || Math.floor(tx_count * 0.35); 
+      const active_wallets = safeParse(stats.active_addresses_24h) || safeParse(stats.active_accounts_24h) || 0; 
       const new_wallets = safeParse(stats.new_addresses_24h);
       const new_contracts = safeParse(stats.new_contracts_24h);
       const avg_gas_fee = stats.average_gas_price ? parseFloat(stats.average_gas_price) : 0;
