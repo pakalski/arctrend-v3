@@ -64,16 +64,17 @@ export default function Home() {
       </div>
 
       <div className="max-w-7xl mx-auto px-8 py-8">
-        <div className="flex flex-wrap gap-2 border-b border-slate-800 mb-8">
+        <div className="flex flex-wrap gap-2 border-b border-slate-800 mb-8 overflow-x-auto">
           {[
             { id: 'overview', label: 'Network Overview' },
             { id: 'competitive', label: 'Competitive Benchmark' },
-            { id: 'institutional', label: 'Institutional Signals' }
+            { id: 'institutional', label: 'Institutional Signals' },
+            { id: 'data', label: 'Raw Data Table' }
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-6 py-4 text-sm font-semibold rounded-t-xl transition-all ${
+              className={`px-6 py-4 text-sm font-semibold rounded-t-xl transition-all whitespace-nowrap ${
                 activeTab === tab.id 
                 ? 'bg-slate-800 text-emerald-400 border-b-2 border-emerald-400' 
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
@@ -176,6 +177,47 @@ export default function Home() {
               <KpiChart title="USDC Bridge Volume (Simulated/Placeholder)" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="usdc_volume" color="#0ea5e9" prefix="$" />
               <KpiChart title="Average Gas Fee (Wei)" data={filteredData.filter(d => d.network === 'arc_testnet')} dataKey="avg_gas_fee" color="#f43f5e" />
             </div>
+          </div>
+        )}
+
+        {activeTab === 'data' && (
+          <div className="animate-in fade-in duration-500 overflow-x-auto bg-slate-900 border border-slate-800 rounded-2xl shadow-xl">
+            <table className="w-full text-left text-sm text-slate-400">
+              <thead className="bg-slate-950/50 text-slate-300 font-semibold border-b border-slate-800">
+                <tr>
+                  <th className="px-6 py-4">Date</th>
+                  <th className="px-6 py-4">Network</th>
+                  <th className="px-6 py-4 text-right">Transactions</th>
+                  <th className="px-6 py-4 text-right">Active Wallets</th>
+                  <th className="px-6 py-4 text-right">New Contracts</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {/* We use .slice().reverse() to show the newest data at the top of the table */}
+                {filteredData.slice().reverse().map((row, idx) => (
+                  <tr key={idx} className="hover:bg-slate-800/50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-slate-300">{row.date}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
+                        row.network === 'arc_testnet' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                        row.network === 'base_sepolia' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                        'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                      }`}>
+                        {row.network === 'arc_testnet' ? 'ARC TESTNET' : row.network === 'base_sepolia' ? 'BASE SEPOLIA' : 'ARBITRUM SEPOLIA'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right font-mono">{row.tx_count?.toLocaleString() || 0}</td>
+                    <td className="px-6 py-4 text-right font-mono text-emerald-400/90">{row.active_wallets?.toLocaleString() || 0}</td>
+                    <td className="px-6 py-4 text-right font-mono text-fuchsia-400/90">{row.new_contracts?.toLocaleString() || 0}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {filteredData.length === 0 && (
+              <div className="p-8 text-center text-slate-500">
+                Awaiting data synchronization. The table will populate once Supabase is online.
+              </div>
+            )}
           </div>
         )}
       </div>
