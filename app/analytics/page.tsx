@@ -3,9 +3,9 @@ import { useState, useEffect } from 'react';
 import KpiChart from '@/components/KpiChart';
 
 const CHAINS = [
-  { id: 'arc_testnet', name: 'Arc Testnet', baseUrl: 'https://testnet.arcscan.app/api/v2/stats/charts', color: '#10b981' },
-  { id: 'base_sepolia', name: 'Base Sepolia', baseUrl: 'https://base-sepolia.blockscout.com/api/v2/stats/charts', color: '#3b82f6' },
-  { id: 'arbitrum_sepolia', name: 'Arbitrum Sepolia', baseUrl: 'https://arbitrum-sepolia.blockscout.com/api/v2/stats/charts', color: '#c084fc' }
+  { id: 'arc_testnet', name: 'Arc Testnet', color: '#10b981' },
+  { id: 'base_sepolia', name: 'Base Sepolia', color: '#3b82f6' },
+  { id: 'arbitrum_sepolia', name: 'Arbitrum Sepolia', color: '#c084fc' }
 ];
 
 export default function AnalyticsPage() {
@@ -14,76 +14,24 @@ export default function AnalyticsPage() {
   const [selectedMetric, setSelectedMetric] = useState<'tx_count' | 'new_contracts' | 'active_wallets'>('tx_count');
 
   useEffect(() => {
-    async function loadDirectClientHistory() {
-      const aggregatedMap: { [date: string]: any } = {};
-
-      for (const chain of CHAINS) {
-        try {
-          // Fetching directly from the browser natively bypasses Cloudflare bot protection
-          const reqHeaders = { 'Accept': 'application/json' };
-          const [txRes, conRes, actRes] = await Promise.all([
-            fetch(`${chain.baseUrl}/transactions`, { headers: reqHeaders }).catch(() => null),
-            fetch(`${chain.baseUrl}/new-contracts`, { headers: reqHeaders }).catch(() => null),
-            fetch(`${chain.baseUrl}/active-accounts`, { headers: reqHeaders }).catch(() => null)
-          ]);
-
-          const parseOrEmpty = async (res: Response | null) => {
-            if (!res || !res.ok) return [];
-            try { return (await res.json()).chart_data || []; } catch { return []; }
-          };
-
-          const [txItems, conItems, actItems] = await Promise.all([
-            parseOrEmpty(txRes),
-            parseOrEmpty(conRes),
-            parseOrEmpty(actRes)
-          ]);
-
-          // Process Transactions
-          txItems.forEach((item: any) => {
-            const d = item.date;
-            if (!aggregatedMap[d]) aggregatedMap[d] = { date: d };
-            const cleanVal = String(item.tx_count || item.value || '0').replace(/,/g, '');
-            aggregatedMap[d][`${chain.id}_tx_count`] = parseInt(cleanVal, 10) || 0;
-            
-            // Fallback derived wallet calculation if active-accounts endpoint is disabled
-            if (!aggregatedMap[d][`${chain.id}_active_wallets`]) {
-              aggregatedMap[d][`${chain.id}_active_wallets`] = Math.floor((parseInt(cleanVal, 10) || 0) * 0.35);
-            }
-          });
-
-          // Process Contracts
-          conItems.forEach((item: any) => {
-            const d = item.date;
-            if (!aggregatedMap[d]) aggregatedMap[d] = { date: d };
-            const cleanVal = String(item.new_contracts || item.value || '0').replace(/,/g, '');
-            aggregatedMap[d][`${chain.id}_new_contracts`] = parseInt(cleanVal, 10) || 0;
-          });
-
-          // Process Active Accounts
-          actItems.forEach((item: any) => {
-            const d = item.date;
-            if (!aggregatedMap[d]) aggregatedMap[d] = { date: d };
-            const cleanVal = String(item.active_accounts || item.value || '0').replace(/,/g, '');
-            const parsedVal = parseInt(cleanVal, 10);
-            if (!isNaN(parsedVal) && parsedVal > 0) {
-              aggregatedMap[d][`${chain.id}_active_wallets`] = parsedVal;
-            }
-          });
-
-        } catch (err) {
-          console.error(`Client fetch execution error for ${chain.name}:`, err);
+    async function loadProxyData() {
+      try {
+        // Fetch securely from your local Vercel server proxy to bypass CORS entirely
+        const res = await fetch('/api/metrics');
+        if (res.ok) {
+          const result = await res.json();
+          if (result.success) {
+            setHistoryData(result.data || []);
+          }
         }
+      } catch (err) {
+        console.error('Failed to load proxy metrics:', err);
+      } finally {
+        setLoading(false);
       }
-
-      const sortedRows = Object.values(aggregatedMap).sort((a: any, b: any) => 
-        new Date(a.date).getTime() - new Date(b.date).getTime()
-      );
-
-      setHistoryData(sortedRows);
-      setLoading(false);
     }
 
-    loadDirectClientHistory();
+    loadProxyData();
   }, []);
 
   const metricTitles = {
@@ -100,7 +48,7 @@ export default function AnalyticsPage() {
             <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
               Institutional Cross-Chain Analytics
             </h1>
-            <p className="text-slate-400 mt-2 text-lg">Direct API Aggregation Feed • Reliable Multi-Chain Trend Analysis</p>
+            <p className="text-slate-400 mt-2 text-lg">Secure Server Proxy Feed • Reliable Multi-Chain Trend Analysis</p>
           </div>
           <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 p-1.5 rounded-xl overflow-x-auto w-full md:w-auto">
             {(['tx_count', 'active_wallets', 'new_contracts'] as const).map(m => (
@@ -121,10 +69,11 @@ export default function AnalyticsPage() {
 
         {loading ? (
           <div className="flex justify-center items-center h-64 text-slate-500 animate-pulse text-xl">
-            Establishing direct multi-chain connection to Blockscout nodes...
+            Fetching cross-chain historical metrics via Vercel secure proxy...
           </div>
         ) : (
           <div className="space-y-12">
+            {/* Charts Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {CHAINS.map(net => (
                 <div key={net.id} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl">
@@ -142,6 +91,7 @@ export default function AnalyticsPage() {
               ))}
             </div>
 
+            {/* Aggregated Table */}
             <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
               <div className="px-6 py-4 border-b border-slate-800 bg-slate-950/50">
                 <h3 className="font-semibold text-slate-300">Aggregated Audit Log</h3>
@@ -167,6 +117,11 @@ export default function AnalyticsPage() {
                     ))}
                   </tbody>
                 </table>
+                {historyData.length === 0 && (
+                  <div className="p-8 text-center text-slate-500">
+                    No data successfully retrieved from the local proxy route.
+                  </div>
+                )}
               </div>
             </div>
           </div>
